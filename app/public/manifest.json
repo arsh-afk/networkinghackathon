@@ -1,0 +1,14 @@
+{
+  "name": "The Syndicate Accord",
+  "short_name": "Syndicate",
+  "description": "Gamified networking — AURAK Nov 2026",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#07080B",
+  "theme_color": "#07080B",
+  "start_url": "/",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

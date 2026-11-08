@@ -1,0 +1,51 @@
+:root {
+  --ink-950: #07080B;
+  --ink-900: #0E1015;
+  --ink-850: #14171F;
+  --ink-800: #1B1F29;
+  --line:    #232833;
+  --line-brass: rgba(216,180,90,0.22);
+
+  --paper:      #F2EEE6;
+  --paper-dim:  #B9BCC6;
+  --muted:      #9AA0AE;
+  --faint:      #6B7280;
+
+  --brass:      #D8B45A;
+  --brass-deep: #8A6D2B;
+  --brass-wash: rgba(216,180,90,0.08);
+
+  --artificer:      #6AA8FF;
+  --artificer-glow: #2E6BFF;
+  --broker:         #5FD08A;
+  --broker-glow:    #12A15C;
+  --weaver:         #FF9A57;
+  --weaver-glow:    #F2611B;
+  --patron:         #F0C766;
+  --patron-glow:    #C9971F;
+}
+
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html, body {
+  background: var(--ink-950);
+  color: var(--paper);
+  font-family: system-ui, -apple-system, sans-serif;
+  max-width: 100vw;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button, input, select, textarea {
+  font-family: inherit;
+  color: inherit;
+}

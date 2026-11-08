@@ -1,0 +1,674 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The Syndicate Accord — Design Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink-950:#07080B; --ink-900:#0E1015; --ink-850:#14171F; --ink-800:#1B1F29;
+    --line:#232833; --line-brass:rgba(216,180,90,.22);
+    --paper:#F2EEE6; --paper-dim:#B9BCC6; --muted:#9AA0AE; --faint:#6B7280;
+    --brass:#D8B45A; --brass-deep:#8A6D2B; --brass-wash:rgba(216,180,90,.08);
+    --artificer:#6AA8FF; --artificer-glow:#2E6BFF;
+    --broker:#5FD08A;   --broker-glow:#12A15C;
+    --weaver:#FF9A57;   --weaver-glow:#F2611B;
+    --patron:#F0C766;   --patron-glow:#C9971F;
+    --display:'Cinzel','Trajan Pro',Georgia,serif;
+    --ui:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+    --num:'JetBrains Mono',ui-monospace,SFMono-Regular,monospace;
+    --ease:cubic-bezier(.2,.8,.2,1);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--ink-950);color:var(--paper);font-family:var(--ui);
+    -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  body{position:relative;padding:48px 32px 72px;overflow-x:hidden}
+  body::before{
+    content:"";position:fixed;inset:0;pointer-events:none;z-index:99;opacity:.55;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
+  }
+  .wrap{max-width:1560px;margin:0 auto;position:relative;z-index:1}
+
+  /* ---------- page header ---------- */
+  .masthead{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;
+    gap:24px;padding-bottom:20px;border-bottom:1px solid var(--line)}
+  .kicker{font-family:var(--num);font-size:11px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--brass);margin-bottom:14px}
+  h1{font-family:var(--display);font-weight:600;font-size:clamp(26px,3.2vw,40px);
+    letter-spacing:.06em;text-transform:uppercase;line-height:1.1}
+  .sub{margin-top:12px;color:var(--muted);font-size:15px;max-width:62ch;line-height:1.55}
+  .meta{font-family:var(--num);font-size:11px;color:var(--faint);text-align:right;line-height:1.9;letter-spacing:.06em}
+  .meta b{color:var(--paper-dim);font-weight:500}
+
+  /* ---------- stage ---------- */
+  .stage{display:flex;flex-wrap:wrap;gap:56px 40px;align-items:flex-start;
+    justify-content:center;margin-top:56px}
+  .shot{display:flex;flex-direction:column;gap:16px}
+  .shot>figcaption{font-family:var(--num);font-size:10.5px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--faint);display:flex;gap:10px;align-items:center}
+  .shot>figcaption span{color:var(--brass)}
+  .num-dot{width:22px;height:1px;background:var(--line);display:inline-block}
+
+  /* ---------- phone ---------- */
+  .phone{width:390px;height:812px;border-radius:46px;background:var(--ink-900);
+    border:1px solid #2A2F3B;position:relative;overflow:hidden;
+    box-shadow:0 0 0 9px #101318, 0 30px 90px rgba(0,0,0,.7), inset 0 0 0 1px rgba(255,255,255,.03);
+    display:flex;flex-direction:column}
+  .statusbar{height:44px;display:flex;align-items:center;justify-content:space-between;
+    padding:0 26px;font-family:var(--num);font-size:11px;color:var(--paper-dim);
+    letter-spacing:.04em;flex:0 0 auto}
+  .notch{position:absolute;top:10px;left:50%;transform:translateX(-50%);
+    width:108px;height:26px;border-radius:14px;background:#000;z-index:6}
+  .screen{flex:1 1 auto;display:flex;flex-direction:column;min-height:0;position:relative}
+  .pad{padding:0 20px;position:relative;z-index:1}
+
+  /* ---------- shared bits ---------- */
+  .topline{display:flex;align-items:center;justify-content:space-between;padding:6px 0 16px}
+  .brandline{font-family:var(--display);font-size:9.5px;letter-spacing:.2em;
+    text-transform:uppercase;color:var(--paper-dim)}
+  .daybadge{font-family:var(--num);font-size:10px;letter-spacing:.16em;color:var(--brass);
+    border:1px solid var(--line-brass);border-radius:4px;padding:4px 8px;display:flex;gap:6px;align-items:center}
+  .daybadge i{width:4px;height:4px;background:var(--brass);transform:rotate(45deg);display:block}
+
+  .card{background:linear-gradient(180deg,#171B24 0%,#12151C 100%);
+    border:1px solid var(--line);border-radius:14px;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
+
+  .chip{display:inline-flex;align-items:center;gap:7px;height:24px;padding:0 10px 0 8px;
+    border-radius:999px;border:1px solid var(--line);background:rgba(255,255,255,.02);
+    font-family:var(--num);font-size:9.5px;letter-spacing:.16em;text-transform:uppercase}
+  .chip i{width:6px;height:6px;border-radius:2px;display:block}
+  .c-art{color:var(--artificer)} .c-art i{background:var(--artificer);box-shadow:0 0 8px var(--artificer-glow)}
+  .c-brk{color:var(--broker)}    .c-brk i{background:var(--broker);box-shadow:0 0 8px var(--broker-glow)}
+  .c-wvr{color:var(--weaver)}    .c-wvr i{background:var(--weaver);box-shadow:0 0 8px var(--weaver-glow)}
+  .c-pat{color:var(--patron)}    .c-pat i{background:var(--patron);box-shadow:0 0 8px var(--patron-glow)}
+
+  .rule{height:1px;background:linear-gradient(90deg,transparent,var(--line-brass) 18%,var(--line-brass) 82%,transparent);
+    position:relative;margin:20px 0}
+  .rule::after{content:"";position:absolute;left:50%;top:50%;width:5px;height:5px;
+    background:var(--brass);opacity:.8;transform:translate(-50%,-50%) rotate(45deg)}
+
+  .label{font-family:var(--num);font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;color:var(--faint)}
+
+  /* ---------- deck ---------- */
+  .scorecard{padding:18px 18px 14px;position:relative;overflow:hidden}
+  .scorecard::after{content:"";position:absolute;inset:-40% -30% auto auto;width:260px;height:260px;
+    background:radial-gradient(circle,rgba(106,168,255,.16),transparent 68%);pointer-events:none}
+  .score{font-family:var(--num);font-weight:500;font-size:50px;line-height:1;
+    letter-spacing:-.03em;margin:11px 0 2px;font-variant-numeric:tabular-nums}
+  .score small{font-family:var(--num);font-size:11px;letter-spacing:.2em;color:var(--muted);
+    margin-left:8px;vertical-align:6px;font-weight:400}
+  .ranks{display:flex;align-items:baseline;gap:8px;font-family:var(--num);font-size:11.5px;color:var(--muted)}
+  .ranks b{color:var(--paper);font-weight:500}
+  .up{color:var(--broker)}
+  .ladder{margin-top:16px}
+  .rungs{display:flex;gap:3px;margin-top:9px}
+  .rung{flex:1;height:16px;border-radius:2px;background:var(--brass);opacity:.95}
+  .rung.half{opacity:.34;background:var(--brass-deep)}
+  .rung.ghost{opacity:.14;background:var(--paper)}
+  .rung.now{outline:1.5px solid var(--paper);outline-offset:2px}
+  .laddernote{display:flex;justify-content:space-between;margin-top:9px;
+    font-family:var(--num);font-size:9.5px;letter-spacing:.1em;color:var(--faint);text-transform:uppercase}
+  .laddernote b{color:var(--paper-dim);font-weight:500}
+
+  .tasks{margin-top:16px;display:flex;flex-direction:column;gap:2px}
+  .task{display:flex;align-items:center;gap:12px;padding:8px 2px;border-bottom:1px solid rgba(35,40,51,.55)}
+  .task:last-child{border-bottom:0}
+  .ring{width:30px;height:30px;flex:0 0 auto;position:relative}
+  .ring svg{transform:rotate(-90deg)}
+  .taskname{flex:1;font-size:13.5px;color:var(--paper)}
+  .taskname em{display:block;font-style:normal;font-size:10.5px;color:var(--faint);margin-top:2px;letter-spacing:.02em}
+  .taskpts{font-family:var(--num);font-size:11px;color:var(--paper-dim)}
+  .taskpts.done{color:var(--brass)}
+  .done-mark{color:var(--brass);font-size:12px;margin-left:6px}
+
+  .cta{margin:auto 20px 10px;height:50px;border-radius:10px;background:var(--brass);
+    color:#12130F;font-family:var(--display);font-size:13px;font-weight:600;letter-spacing:.14em;
+    text-transform:uppercase;display:flex;align-items:center;justify-content:center;gap:10px;
+    box-shadow:0 1px 0 rgba(255,255,255,.4) inset,0 10px 30px rgba(216,180,90,.16)}
+  .cta svg{opacity:.8}
+  .tabbar{height:68px;flex:0 0 auto;border-top:1px solid var(--line);
+    display:flex;align-items:center;justify-content:space-around;padding-bottom:12px;
+    background:linear-gradient(180deg,rgba(14,16,21,.4),var(--ink-900))}
+  .tab{display:flex;flex-direction:column;align-items:center;gap:5px;
+    font-family:var(--num);font-size:8.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--faint)}
+  .tab.on{color:var(--brass)}
+  .tab svg{opacity:.85}
+  .offline{display:flex;align-items:center;gap:8px;margin:0 20px 8px;padding:7px 10px;
+    border:1px solid rgba(216,180,90,.28);border-radius:8px;background:rgba(216,180,90,.06);
+    font-family:var(--num);font-size:9.5px;letter-spacing:.08em;color:var(--brass)}
+  .offline i{width:5px;height:5px;border-radius:50%;background:var(--brass);box-shadow:0 0 8px var(--brass)}
+
+  /* ---------- scanner ---------- */
+  .camview{position:absolute;inset:0;z-index:2;
+    background:radial-gradient(circle at 50% 30%,#1C2536,#08090C 74%)}
+  .cframe{position:absolute;left:14%;right:14%;top:9%;height:26%;z-index:4}
+  .cframe svg{position:absolute;left:50%;top:52%;transform:translate(-50%,-50%);opacity:.92}
+  .cframe i{position:absolute;width:32px;height:32px;border:2.5px solid rgba(216,180,90,.92);z-index:2}
+  .cframe i:nth-child(1){top:0;left:0;border-right:0;border-bottom:0;border-radius:9px 0 0 0}
+  .cframe i:nth-child(2){top:0;right:0;border-left:0;border-bottom:0;border-radius:0 9px 0 0}
+  .cframe i:nth-child(3){bottom:0;left:0;border-right:0;border-top:0;border-radius:0 0 0 9px}
+  .cframe i:nth-child(4){bottom:0;right:0;border-left:0;border-top:0;border-radius:0 0 9px 0}
+  .scanline{position:absolute;left:2%;right:2%;height:2px;border-radius:2px;
+    background:linear-gradient(90deg,transparent,var(--brass),transparent);
+    box-shadow:0 0 22px rgba(216,180,90,.55);animation:scan 2.6s var(--ease) infinite}
+  @keyframes scan{0%{top:8%}50%{top:90%}100%{top:8%}}
+  .camhint{position:absolute;left:0;right:0;bottom:24px;text-align:center;z-index:4;
+    font-family:var(--num);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:var(--faint)}
+  .scrollfade{position:absolute;left:0;right:0;bottom:68px;height:56px;z-index:3;
+    background:linear-gradient(transparent,var(--ink-900));pointer-events:none}
+
+  /* ---------- scan sheet ---------- */
+  .scrim{position:absolute;inset:0;z-index:3;background:linear-gradient(180deg,
+    rgba(7,8,11,.55) 0%,rgba(7,8,11,0) 24%,rgba(7,8,11,.18) 52%,rgba(7,8,11,.94) 100%)}
+  .sheet{position:absolute;left:0;right:0;bottom:0;z-index:5;border-radius:20px 20px 0 0;
+    background:linear-gradient(180deg,#171B24,#0F1218 70%);border-top:1px solid var(--line-brass);
+    padding:10px 20px 24px;box-shadow:0 -30px 80px rgba(0,0,0,.7)}
+  .grabber{width:44px;height:3px;border-radius:2px;background:#39404E;margin:0 auto 18px}
+  .sheethead{display:flex;align-items:center;gap:12px;margin-bottom:20px}
+  .sigil{width:46px;height:46px;flex:0 0 auto;border-radius:12px;display:grid;place-items:center;
+    border:1px solid rgba(255,154,87,.35);background:radial-gradient(circle at 30% 20%,rgba(242,97,27,.28),rgba(255,154,87,.04) 70%)}
+  .sheetname{font-family:var(--display);font-size:16px;letter-spacing:.05em}
+  .sheetdesc{font-size:11px;color:var(--muted);margin-top:3px}
+  .badgecode{font-family:var(--num);font-size:10px;letter-spacing:.24em;color:var(--faint);margin-top:5px}
+  .lines{display:flex;flex-direction:column;gap:11px;margin-bottom:6px}
+  .line{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;color:var(--paper-dim)}
+  .line b{font-family:var(--num);font-size:12.5px;color:var(--paper);font-weight:500}
+  .line b.zero{color:var(--faint)}
+  .total{display:flex;justify-content:space-between;align-items:flex-end;
+    border-top:1px solid var(--line);margin-top:14px;padding-top:14px}
+  .totallabel{font-family:var(--num);font-size:10px;letter-spacing:.22em;text-transform:uppercase;color:var(--brass)}
+  .totallabel em{display:block;font-style:normal;font-size:10px;letter-spacing:.04em;
+    text-transform:none;color:var(--faint);margin-top:5px}
+  .totalnum{font-family:var(--num);font-size:34px;font-weight:500;letter-spacing:-.02em}
+  .actions{display:flex;gap:10px;margin-top:20px}
+  .ghostbtn{flex:1;height:46px;border-radius:9px;border:1px solid var(--line-brass);
+    display:grid;place-items:center;font-family:var(--num);font-size:10px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--brass);background:rgba(216,180,90,.04)}
+  .dismiss{text-align:center;margin-top:16px;font-family:var(--num);font-size:9.5px;
+    letter-spacing:.16em;text-transform:uppercase;color:var(--faint)}
+
+  /* ---------- network ---------- */
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--line);
+    border:1px solid var(--line);border-radius:12px;overflow:hidden;margin:4px 0 18px}
+  .stat{background:var(--ink-900);padding:11px 12px}
+  .stat b{display:block;font-family:var(--num);font-size:19px;font-weight:500;letter-spacing:-.02em}
+  .stat span{display:block;font-family:var(--num);font-size:8.5px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--faint);margin-top:5px}
+  .graphbox{position:relative;height:196px;border:1px solid var(--line);border-radius:14px;
+    overflow:hidden;background:
+      radial-gradient(circle at 50% 50%,rgba(106,168,255,.10),transparent 62%),
+      linear-gradient(180deg,#101319,#0C0F14)}
+  .graphbox svg{position:absolute;inset:0;width:100%;height:100%}
+  .grouplabel{display:flex;align-items:center;gap:9px;margin:20px 0 2px}
+  .grouplabel span{font-family:var(--num);font-size:9px;letter-spacing:.2em;text-transform:uppercase}
+  .grouplabel em{font-family:var(--num);font-style:normal;font-size:9px;color:var(--faint);letter-spacing:.1em}
+  .grouplabel hr{flex:1;border:0;border-top:1px solid var(--line)}
+  .conn{display:flex;align-items:center;gap:11px;padding:11px 0;border-bottom:1px solid rgba(35,40,51,.5)}
+  .conn:last-child{border-bottom:0}
+  .avatar{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;
+    font-family:var(--display);font-size:11px;letter-spacing:.02em;flex:0 0 auto}
+  .connname{flex:1;font-size:13px}
+  .connname em{display:block;font-style:normal;font-size:10px;color:var(--faint);margin-top:2px}
+  .marks{display:flex;gap:4px}
+  .marks i{width:5px;height:5px;border-radius:50%;display:block;background:#2C3240}
+  .marks i.on{background:var(--brass)}
+
+  /* ---------- arena ---------- */
+  .wide{width:1120px;max-width:100%;border-radius:16px;border:1px solid var(--line);
+    background:radial-gradient(120% 140% at 84% -20%,rgba(216,180,90,.07),transparent 55%),
+      linear-gradient(180deg,#0B0D12,#090A0E);padding:40px 44px 34px;position:relative;overflow:hidden}
+  .wide::before{content:"";position:absolute;inset:0;
+    background:repeating-linear-gradient(0deg,rgba(255,255,255,.014) 0 1px,transparent 1px 3px);
+    pointer-events:none}
+  .arenahead{display:flex;justify-content:space-between;align-items:baseline;
+    padding-bottom:16px;border-bottom:1px solid var(--line-brass)}
+  .arenatitle{font-family:var(--display);font-size:19px;letter-spacing:.16em;text-transform:uppercase}
+  .arenameta{font-family:var(--num);font-size:11px;letter-spacing:.18em;color:var(--brass);text-transform:uppercase}
+  .rows{margin-top:26px;display:flex;flex-direction:column}
+  .lrow{display:grid;grid-template-columns:52px 92px 1fr auto auto;align-items:center;gap:20px;
+    padding:16px 14px 16px 12px;border-bottom:1px solid rgba(35,40,51,.6);position:relative}
+  .lrow::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:2px;border-radius:2px;opacity:.9}
+  .lrow.r1{background:linear-gradient(90deg,rgba(240,199,102,.07),transparent 60%)}
+  .lrow.r1::before{background:var(--patron)}
+  .lrow.r2::before{background:var(--weaver)}
+  .lrow.r3::before{background:var(--artificer)}
+  .lrow.r4::before{background:var(--broker)}
+  .lrow.r5::before{background:var(--patron);opacity:.4}
+  .lrow.r6::before{background:var(--weaver);opacity:.4}
+  .rank{font-family:var(--num);font-size:26px;font-weight:500;color:var(--paper-dim);letter-spacing:-.03em}
+  .lrow.r1 .rank{color:var(--brass)}
+  .lrole{font-family:var(--num);font-size:10px;letter-spacing:.16em;text-transform:uppercase}
+  .lname{font-family:var(--display);font-size:22px;letter-spacing:.04em}
+  .lpts{font-family:var(--num);font-size:24px;text-align:right;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+  .delta{font-family:var(--num);font-size:11px;color:var(--broker);width:52px;text-align:right;letter-spacing:.06em}
+  .delta.flat{color:var(--faint)}
+  .arenafoot{display:flex;justify-content:space-between;align-items:flex-end;margin-top:30px;gap:30px}
+  .tickers{display:flex;gap:44px}
+  .tick b{display:block;font-family:var(--num);font-size:27px;font-weight:500;letter-spacing:-.02em}
+  .tick span{display:block;font-family:var(--num);font-size:9px;letter-spacing:.2em;
+    text-transform:uppercase;color:var(--faint);margin-top:7px}
+  .factionbar{flex:0 0 380px}
+  .factionbar .bar{display:flex;height:6px;border-radius:3px;overflow:hidden;margin-top:10px}
+  .factionbar .bar i{display:block}
+  .factionbar .legend{display:flex;justify-content:space-between;margin-top:10px;
+    font-family:var(--num);font-size:9px;letter-spacing:.1em;text-transform:uppercase}
+  .factionbar .legend span{display:flex;align-items:center;gap:6px;color:var(--faint)}
+  .factionbar .legend b{color:var(--paper-dim);font-weight:500}
+
+  /* ---------- token strip ---------- */
+  .tokens{margin-top:80px;padding-top:34px;border-top:1px solid var(--line);
+    display:grid;grid-template-columns:repeat(auto-fit,minmax(238px,1fr));gap:40px 44px}
+  .tokens h3{font-family:var(--num);font-size:10px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--brass);margin-bottom:18px}
+  .swatches{display:flex;flex-wrap:wrap;gap:10px}
+  .sw{width:64px}
+  .sw i{display:block;height:34px;border-radius:7px;border:1px solid rgba(255,255,255,.07)}
+  .sw span{display:block;font-family:var(--num);font-size:8px;letter-spacing:.08em;
+    color:var(--faint);margin-top:6px;text-transform:uppercase}
+  .spec-display{font-family:var(--display);font-size:30px;letter-spacing:.06em;
+    text-transform:uppercase;line-height:1.15}
+  .spec-body{font-size:13.5px;color:var(--muted);line-height:1.6;margin-top:12px;max-width:40ch}
+  .spec-num{font-family:var(--num);font-size:13px;color:var(--paper-dim);margin-top:14px;letter-spacing:.04em}
+  .notes{margin-top:34px;display:flex;gap:26px;flex-wrap:wrap;
+    font-family:var(--num);font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint)}
+  .notes b{color:var(--brass);font-weight:500}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <div>
+      <div class="kicker">Design prototype · no logic · v1</div>
+      <h1>The Syndicate Accord</h1>
+      <p class="sub">The Inked Ledger — a dark, engraved-paper interface for a week-long
+        competitive networking game. Brass rules, four faction colours, zero images,
+        everything legible one-handed in a dim room.</p>
+    </div>
+    <div class="meta">
+      <div><b>Viewport</b> 390 × 812 · 1920 × 1080</div>
+      <div><b>Type</b> Cinzel · Inter · JetBrains Mono</div>
+      <div><b>Weight</b> 0 KB images · &lt; 120 KB JS</div>
+    </div>
+  </header>
+
+  <div class="stage">
+
+    <!-- ============ 1. DECK ============ -->
+    <figure class="shot">
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="statusbar"><span>21:04</span><span>◗◗◗ ▮</span></div>
+        <div class="screen">
+          <div class="pad">
+            <div class="topline">
+              <span class="brandline">The Syndicate Accord</span>
+              <span class="daybadge"><i></i>Day 2</span>
+            </div>
+
+            <div class="card scorecard">
+              <span class="chip c-art"><i></i>Artificer</span>
+              <div class="score">187<small>PTS</small></div>
+              <div class="ranks"><b>12th</b> of 125 <span class="up">▲ 3</span></div>
+
+              <div class="ladder">
+                <div class="rungs">
+                  <i class="rung"></i><i class="rung"></i><i class="rung"></i><i class="rung"></i>
+                  <i class="rung"></i><i class="rung"></i><i class="rung"></i>
+                  <i class="rung now"></i>
+                  <i class="rung half"></i><i class="rung half"></i><i class="rung half"></i>
+                  <i class="rung half"></i><i class="rung half"></i><i class="rung half"></i>
+                  <i class="rung ghost"></i>
+                </div>
+                <div class="laddernote">
+                  <span><b>8</b> marks today · full value</span>
+                  <span>next · half</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="tasks">
+              <div class="label" style="margin:14px 0 2px">Today</div>
+
+              <div class="task">
+                <div class="ring">
+                  <svg width="30" height="30"><circle cx="15" cy="15" r="12" fill="none" stroke="#252B36" stroke-width="3"/>
+                  <circle cx="15" cy="15" r="12" fill="none" stroke="#D8B45A" stroke-width="3"
+                    stroke-dasharray="75.4" stroke-dashoffset="0" stroke-linecap="round"/></svg>
+                </div>
+                <div class="taskname">Daily Cross<em>2 factions held</em></div>
+                <div class="taskpts done">+6<span class="done-mark">✓</span></div>
+              </div>
+
+              <div class="task">
+                <div class="ring">
+                  <svg width="30" height="30"><circle cx="15" cy="15" r="12" fill="none" stroke="#252B36" stroke-width="3"/>
+                  <circle cx="15" cy="15" r="12" fill="none" stroke="#6AA8FF" stroke-width="3"
+                    stroke-dasharray="75.4" stroke-dashoffset="60" stroke-linecap="round"/></svg>
+                </div>
+                <div class="taskname">Echo Note<em>1 of 5 written</em></div>
+                <div class="taskpts">+3</div>
+              </div>
+
+              <div class="task">
+                <div class="ring">
+                  <svg width="30" height="30"><circle cx="15" cy="15" r="12" fill="none" stroke="#252B36" stroke-width="3"/>
+                  <circle cx="15" cy="15" r="12" fill="none" stroke="#F0C766" stroke-width="3"
+                    stroke-dasharray="75.4" stroke-dashoffset="45" stroke-linecap="round"/></svg>
+                </div>
+                <div class="taskname">Patron Touch<em>2 of 5 full-value</em></div>
+                <div class="taskpts">+5</div>
+              </div>
+
+              <div class="task">
+                <div class="ring">
+                  <svg width="30" height="30"><circle cx="15" cy="15" r="12" fill="none" stroke="#252B36" stroke-width="3"/>
+                  <circle cx="15" cy="15" r="12" fill="none" stroke="#5FD08A" stroke-width="3"
+                    stroke-dasharray="75.4" stroke-dashoffset="35" stroke-linecap="round"/></svg>
+                </div>
+                <div class="taskname">Game Challenger<em>2 of 3 opponents</em></div>
+                <div class="taskpts">+10</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="offline"><i></i>1 mark waiting to sync</div>
+
+          <div class="cta">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M3 8V4h4M17 4h4v4M21 16v4h-4M7 20H3v-4"/><path d="M3 12h18"/>
+            </svg>
+            Scan a badge
+          </div>
+
+          <nav class="tabbar">
+            <div class="tab on">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M4 6h16M4 12h16M4 18h10"/></svg>Deck</div>
+            <div class="tab">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <rect x="3" y="4" width="7" height="7" rx="1"/><rect x="14" y="4" width="7" height="7" rx="1"/>
+                <rect x="3" y="15" width="7" height="6" rx="1"/><path d="M14 18h7"/></svg>Scan</div>
+            <div class="tab">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <circle cx="12" cy="12" r="3"/><circle cx="5" cy="5" r="2"/><circle cx="19" cy="5" r="2"/>
+                <circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/>
+                <path d="M7 7l3 3M17 7l-3 3M7 17l3-3M17 17l-3-3"/></svg>Network</div>
+            <div class="tab">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <circle cx="12" cy="8" r="3.4"/><path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6"/></svg>Me</div>
+          </nav>
+        </div>
+      </div>
+      <figcaption><span>01</span><i class="num-dot"></i>The Deck — score, the ladder, today's contracts</figcaption>
+    </figure>
+
+    <!-- ============ 2. SCAN RESULT ============ -->
+    <figure class="shot">
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="statusbar"><span>21:06</span><span>◗◗◗ ▮</span></div>
+        <div class="screen" style="overflow:hidden">
+          <div class="pad" style="opacity:.28">
+            <div class="topline">
+              <span class="brandline">The Syndicate Accord</span>
+              <span class="daybadge"><i></i>Day 2</span>
+            </div>
+            <div class="card scorecard">
+              <span class="chip c-art"><i></i>Artificer</span>
+              <div class="score">192<small>PTS</small></div>
+              <div class="ranks"><b>11th</b> of 125 <span class="up">▲ 1</span></div>
+              <div class="ladder"><div class="rungs">
+                <i class="rung"></i><i class="rung"></i><i class="rung"></i><i class="rung"></i>
+                <i class="rung"></i><i class="rung"></i><i class="rung"></i><i class="rung"></i>
+                <i class="rung now half"></i><i class="rung half"></i><i class="rung half"></i>
+                <i class="rung half"></i><i class="rung half"></i><i class="rung half"></i>
+                <i class="rung ghost"></i>
+              </div></div>
+            </div>
+          </div>
+
+          <div class="camview">
+            <div class="cframe">
+              <svg width="150" height="150" viewBox="0 0 21 21" fill="#F2EEE6">
+                <path d="M0 0h7v7H0zM2 2v3h3V2zM14 0h7v7h-7zM16 2v3h3V2zM0 14h7v7H0zM2 16v3h3v-3z"/>
+                <path d="M9 0h1v1H9zM11 0h1v1h-1zM9 2h1v1H9zM11 3h1v1h-1zM9 4h1v1H9zM12 5h1v1h-1zM10 6h1v1h-1zM9 8h2v1H9zM12 8h1v1h-1zM14 8h1v1h-1zM16 8h1v1h-1zM18 8h2v1h-2zM0 9h1v1H0zM2 9h1v1H2zM4 9h1v1H4zM6 9h1v1H6zM9 10h1v1H9zM11 10h1v1h-1zM13 10h1v1h-1zM15 10h1v1h-1zM17 10h1v1h-1zM19 10h1v1h-1zM8 12h1v1H8zM10 12h1v1h-1zM12 12h1v1h-1zM15 12h1v1h-1zM17 12h1v1h-1zM9 14h1v1H9zM11 14h2v1h-2zM15 14h1v1h-1zM18 14h1v1h-1zM9 16h1v1H9zM12 16h1v1h-1zM14 16h1v1h-1zM16 16h1v1h-1zM19 16h1v1h-1zM9 18h1v1H9zM11 18h1v1h-1zM13 18h1v1h-1zM15 18h1v1h-1zM17 18h1v1h-1z"/>
+              </svg>
+              <i></i><i></i><i></i><i></i><span class="scanline"></span>
+            </div>
+          </div>
+          <div class="camhint">Hold the badge inside the frame</div>
+
+          <div class="scrim"></div>
+
+          <div class="sheet">
+            <div class="grabber"></div>
+            <div class="sheethead">
+              <div class="sigil">
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#FF9A57" stroke-width="1.4">
+                  <circle cx="12" cy="12" r="9"/><path d="M12 3c4 3 4 15 0 18M12 3c-4 3-4 15 0 18"/>
+                  <path d="M3.5 12h17"/>
+                </svg>
+              </div>
+              <div>
+                <div class="chip c-wvr" style="margin-bottom:6px"><i></i>Weaver</div>
+                <div class="sheetname">Layla Haddad</div>
+                <div class="sheetdesc">“writes in the margins”</div>
+                <div class="badgecode">042 917</div>
+              </div>
+            </div>
+
+            <div class="lines">
+              <div class="line"><span>Initiated</span><b>+3.00</b></div>
+              <div class="line"><span>Crossed faction</span><b>+2.00</b></div>
+              <div class="line"><span>Patron</span><b class="zero">+0.00</b></div>
+            </div>
+
+            <div class="total">
+              <div class="totallabel">Mark<em>Rung 9 of 15 · half value</em></div>
+              <div class="totalnum">+5.00</div>
+            </div>
+
+            <div class="actions">
+              <div class="ghostbtn">Echo note</div>
+              <div class="ghostbtn">Challenge</div>
+            </div>
+            <div class="dismiss">Done · scan again</div>
+          </div>
+        </div>
+      </div>
+      <figcaption><span>02</span><i class="num-dot"></i>Scan result — the breakdown is the product</figcaption>
+    </figure>
+
+    <!-- ============ 3. NETWORK ============ -->
+    <figure class="shot">
+      <div class="phone">
+        <div class="notch"></div>
+        <div class="statusbar"><span>22:41</span><span>◗◗◗ ▮</span></div>
+        <div class="screen">
+          <div class="pad" style="display:flex;flex-direction:column;height:100%">
+            <div class="topline">
+              <span class="brandline">Your threads</span>
+              <span class="daybadge"><i></i>41 held</span>
+            </div>
+
+            <div class="stats">
+              <div class="stat"><b>41</b><span>Connections</span></div>
+              <div class="stat"><b>4/4</b><span>Roles</span></div>
+              <div class="stat"><b>2.1×</b><span>Initiated</span></div>
+            </div>
+
+            <div class="graphbox">
+              <svg viewBox="0 0 342 196" preserveAspectRatio="none">
+                <g stroke="#39404E" stroke-width="1" opacity=".55">
+                  <line x1="171" y1="98" x2="86"  y2="52"/>
+                  <line x1="171" y1="98" x2="248" y2="46"/>
+                  <line x1="171" y1="98" x2="268" y2="120"/>
+                  <line x1="171" y1="98" x2="210" y2="164"/>
+                  <line x1="171" y1="98" x2="104" y2="150"/>
+                  <line x1="171" y1="98" x2="58"  y2="106"/>
+                  <line x1="86"  y1="52" x2="248" y2="46"/>
+                  <line x1="58"  y1="106" x2="104" y2="150"/>
+                  <line x1="210" y1="164" x2="268" y2="120"/>
+                  <line x1="86"  y1="52" x2="58"  y2="106"/>
+                </g>
+                <g>
+                  <circle cx="86"  cy="52"  r="6" fill="#FF9A57" opacity=".9"/>
+                  <circle cx="248" cy="46"  r="7" fill="#F0C766" opacity=".9"/>
+                  <circle cx="268" cy="120" r="5" fill="#5FD08A" opacity=".9"/>
+                  <circle cx="210" cy="164" r="5" fill="#FF9A57" opacity=".8"/>
+                  <circle cx="104" cy="150" r="6" fill="#F0C766" opacity=".8"/>
+                  <circle cx="58"  cy="106" r="4" fill="#5FD08A" opacity=".75"/>
+                </g>
+                <circle cx="171" cy="98" r="16" fill="none" stroke="#6AA8FF" stroke-width="1" opacity=".35"/>
+                <circle cx="171" cy="98" r="9" fill="#6AA8FF"/>
+                <circle cx="171" cy="98" r="9" fill="none" stroke="#0E1015" stroke-width="2"/>
+              </svg>
+            </div>
+
+            <div class="grouplabel"><span style="color:var(--weaver)">Weaver</span><em>14</em><hr></div>
+
+            <div class="conn">
+              <div class="avatar" style="color:#FF9A57;background:rgba(255,154,87,.10);border:1px solid rgba(255,154,87,.28)">LH</div>
+              <div class="connname">Layla Haddad<em>Day 2 · note, 1 game</em></div>
+              <div class="marks"><i class="on"></i><i class="on"></i><i></i></div>
+            </div>
+            <div class="conn">
+              <div class="avatar" style="color:#FF9A57;background:rgba(255,154,87,.10);border:1px solid rgba(255,154,87,.28)">SR</div>
+              <div class="connname">Sami Rahal<em>Day 1 · questionnaire</em></div>
+              <div class="marks"><i class="on"></i><i></i><i></i></div>
+            </div>
+            <div class="conn">
+              <div class="avatar" style="color:#FF9A57;background:rgba(255,154,87,.10);border:1px solid rgba(255,154,87,.28)">MA</div>
+              <div class="connname">Mira Aziz<em>Day 2</em></div>
+              <div class="marks"><i class="on"></i><i></i><i></i></div>
+            </div>
+
+            <div class="grouplabel"><span style="color:var(--patron)">Patron</span><em>6</em><hr></div>
+            <div class="conn">
+              <div class="avatar" style="color:#F0C766;background:rgba(240,199,102,.10);border:1px solid rgba(240,199,102,.28)">FM</div>
+              <div class="connname">Farid Al-Mansoori<em>Day 2 · patron touch</em></div>
+              <div class="marks"><i class="on"></i><i class="on"></i><i class="on"></i></div>
+            </div>
+          </div>
+          <div class="scrollfade"></div>
+
+          <nav class="tabbar">
+            <div class="tab">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <path d="M4 6h16M4 12h16M4 18h10"/></svg>Deck</div>
+            <div class="tab">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <rect x="3" y="4" width="7" height="7" rx="1"/><rect x="14" y="4" width="7" height="7" rx="1"/>
+                <rect x="3" y="15" width="7" height="6" rx="1"/><path d="M14 18h7"/></svg>Scan</div>
+            <div class="tab on">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <circle cx="12" cy="12" r="3"/><circle cx="5" cy="5" r="2"/><circle cx="19" cy="5" r="2"/>
+                <circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/>
+                <path d="M7 7l3 3M17 7l-3 3M7 17l3-3M17 17l-3-3"/></svg>Network</div>
+            <div class="tab">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                <circle cx="12" cy="8" r="3.4"/><path d="M5 20c0-3.6 3.1-6 7-6s7 2.4 7 6"/></svg>Me</div>
+          </nav>
+        </div>
+      </div>
+      <figcaption><span>03</span><i class="num-dot"></i>Network — your threads, grouped by faction</figcaption>
+    </figure>
+  </div>
+
+  <!-- ============ 4. ARENA ============ -->
+  <div class="stage" style="margin-top:64px">
+    <figure class="shot" style="flex:1">
+      <div class="wide">
+        <div class="arenahead">
+          <div class="arenatitle">The Syndicate Accord</div>
+          <div class="arenameta">Day 3 · 21:04 · live</div>
+        </div>
+
+        <div class="rows">
+          <div class="lrow r1"><div class="rank">01</div><div class="lrole" style="color:var(--patron)">Patron</div>
+            <div class="lname">Farid Al-Mansoori</div><div class="delta">▲ 12</div><div class="lpts">248</div></div>
+          <div class="lrow r2"><div class="rank">02</div><div class="lrole" style="color:var(--weaver)">Weaver</div>
+            <div class="lname">Layla Haddad</div><div class="delta">▲ 7</div><div class="lpts">231</div></div>
+          <div class="lrow r3"><div class="rank">03</div><div class="lrole" style="color:var(--artificer)">Artificer</div>
+            <div class="lname">Omar Rashed</div><div class="delta flat">—</div><div class="lpts">207</div></div>
+          <div class="lrow r4"><div class="rank">04</div><div class="lrole" style="color:var(--broker)">Broker</div>
+            <div class="lname">Hana Qureshi</div><div class="delta">▲ 4</div><div class="lpts">196</div></div>
+          <div class="lrow r5"><div class="rank">05</div><div class="lrole" style="color:var(--patron)">Patron</div>
+            <div class="lname">Youssef Baraka</div><div class="delta flat">—</div><div class="lpts">188</div></div>
+          <div class="lrow r6" style="border-bottom:0"><div class="rank">06</div><div class="lrole" style="color:var(--weaver)">Weaver</div>
+            <div class="lname">Mira Aziz</div><div class="delta">▲ 2</div><div class="lpts">174</div></div>
+        </div>
+
+        <div class="arenafoot">
+          <div class="tickers">
+            <div class="tick"><b>2 418</b><span>Live marks</span></div>
+            <div class="tick"><b>1 902</b><span>Connections</span></div>
+            <div class="tick"><b>4 / 4</b><span>Roles reached</span></div>
+          </div>
+          <div class="factionbar">
+            <div class="label">Faction totals</div>
+            <div class="bar">
+              <i style="width:29%;background:var(--artificer)"></i>
+              <i style="width:24%;background:var(--broker)"></i>
+              <i style="width:26%;background:var(--weaver)"></i>
+              <i style="width:21%;background:var(--patron)"></i>
+            </div>
+            <div class="legend">
+              <span><b style="color:var(--artificer)">■</b> 29%</span>
+              <span><b style="color:var(--broker)">■</b> 24%</span>
+              <span><b style="color:var(--weaver)">■</b> 26%</span>
+              <span><b style="color:var(--patron)">■</b> 21%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <figcaption style="margin-top:18px"><span>04</span><i class="num-dot"></i>Arena — the projected board. Ten rows, no scroll, faction totals always visible</figcaption>
+    </figure>
+  </div>
+
+  <!-- ============ tokens ============ -->
+  <section class="tokens">
+    <div>
+      <h3>Factions</h3>
+      <div class="swatches">
+        <div class="sw"><i style="background:var(--artificer)"></i><span>Artificer</span></div>
+        <div class="sw"><i style="background:var(--broker)"></i><span>Broker</span></div>
+        <div class="sw"><i style="background:var(--weaver)"></i><span>Weaver</span></div>
+        <div class="sw"><i style="background:var(--patron)"></i><span>Patron</span></div>
+        <div class="sw"><i style="background:var(--brass)"></i><span>Brass</span></div>
+        <div class="sw"><i style="background:var(--ink-900);border-color:#2A2F3B"></i><span>Ink 900</span></div>
+      </div>
+      <p class="spec-body" style="font-size:11.5px">Every faction pair was checked for contrast and for
+        colour-blind separation. A role is never communicated by colour alone.</p>
+    </div>
+    <div>
+      <h3>Type</h3>
+      <div class="spec-display">Mark<br>the Ledger</div>
+      <div class="spec-num">187 &nbsp;· &nbsp;+5.00 &nbsp;· &nbsp;rung 9 / 15</div>
+      <p class="spec-body">Cinzel for names and numbers that matter, Inter for sentences,
+        JetBrains Mono for every figure that can change.</p>
+    </div>
+    <div>
+      <h3>Rules of the interface</h3>
+      <p class="spec-body" style="margin-top:0">
+        Nothing important under 14 px. Every target 48 px. One accent colour, used sparingly.
+        No images anywhere — the entire app weighs less than a single photograph.
+        The diminishing-returns ladder is always visible, because a rule players can see
+        is not a controversy.
+      </p>
+    </div>
+  </section>
+
+  <div class="notes">
+    <span><b>Static prototype</b> — no data, no logic</span>
+    <span>Full spec: 03-ui-design-system.md</span>
+    <span>5 signature moments: role flip · the mark · the ladder · arena reorder · the mesh</span>
+  </div>
+</div>
+</body>
+</html>
