@@ -209,7 +209,7 @@ export default function ScanClient({ player }: { player: Record<string, unknown>
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const scanningRef = useRef(false);
-  const clientUuidRef = useRef<string>(`${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  const clientUuidRef = useRef<string>(crypto.randomUUID());
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -279,11 +279,10 @@ export default function ScanClient({ player }: { player: Record<string, unknown>
     if (submitting) return;
     setSubmitting(true);
     try {
-      const clientUuid = `${clientUuidRef.current}-${code}`;
       const res = await fetch("/api/scans", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code, via, clientUuid }),
+        body: JSON.stringify({ code, via, clientUuid: clientUuidRef.current }),
       });
       const data = await res.json() as ScanResult | ScanError;
       if (data.ok) {
@@ -314,7 +313,7 @@ export default function ScanClient({ player }: { player: Record<string, unknown>
     setState({ kind: "scanning" });
     scanningRef.current = false;
     // New client UUID for next scan
-    clientUuidRef.current = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    clientUuidRef.current = crypto.randomUUID();
   }
 
   const role = (player.role as string | undefined)?.toLowerCase() ?? "artificer";
@@ -419,7 +418,7 @@ export default function ScanClient({ player }: { player: Record<string, unknown>
                 type="text"
                 className="input input-code"
                 inputMode="numeric"
-                pattern="\d{6}"
+                pattern="\d{3}\s?\d{3}"
                 maxLength={7}
                 placeholder="042 917"
                 value={manualCode}
@@ -495,4 +494,3 @@ export default function ScanClient({ player }: { player: Record<string, unknown>
     </main>
   );
 }
-

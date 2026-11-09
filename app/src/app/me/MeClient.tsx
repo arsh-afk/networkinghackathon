@@ -50,13 +50,24 @@ function QRDisplay({ payload }: { payload: string }) {
   );
 }
 
-export default function MeClient({ player }: { player: Record<string, unknown> }) {
+export default function MeClient({
+  player,
+  character,
+  characterError,
+}: {
+  player: Record<string, unknown>;
+  character: Record<string, unknown> | null;
+  characterError: boolean;
+}) {
   const router = useRouter();
   const role = (player.role as string | undefined) ?? "artificer";
   const name = (player.display_name as string | undefined) ?? "Agent";
   const badgeCode = (player.badge_code as string | undefined) ?? "000000";
   const roleColor = getRoleVar(role);
   const roleLabel = getRoleLabel(role);
+  const traits = Array.isArray(character?.traits)
+    ? character.traits.filter((trait): trait is string => typeof trait === "string")
+    : [];
 
   const badgePayload = `SA1|${badgeCode}|${name}|${role.charAt(0).toUpperCase()}`;
   const displayCode = `${badgeCode.slice(0, 3)} ${badgeCode.slice(3)}`;
@@ -68,15 +79,10 @@ export default function MeClient({ player }: { player: Record<string, unknown> }
 
   return (
     <main
-      style={{
-        minHeight: "100dvh",
-        background: "var(--ink-950)",
-        paddingTop: "env(safe-area-inset-top, 0px)",
-        paddingBottom: "calc(72px + env(safe-area-inset-bottom, 0px))",
-      }}
+      className="app-screen"
     >
       {/* Header */}
-      <header style={{ padding: "16px 20px", borderBottom: "var(--stroke)" }}>
+      <header style={{ borderBottom: "var(--stroke)" }}>
         <h1 className="font-display text-label text-brass" style={{ letterSpacing: "0.1em" }}>
           YOUR PROFILE
         </h1>
@@ -108,11 +114,63 @@ export default function MeClient({ player }: { player: Record<string, unknown> }
           </div>
         </section>
 
+        {character && (
+          <section className="card character-dossier" aria-labelledby="character-heading">
+            <div className="text-label text-brass" style={{ marginBottom: 8 }}>
+              YOUR CHARACTER · #{String(character.badgeCode ?? badgeCode)}
+            </div>
+            <h2 id="character-heading" className="font-display" style={{ fontSize: 21, marginBottom: 8 }}>
+              {String(character.title ?? roleLabel)}
+            </h2>
+            <p style={{ color: "var(--brass)", fontSize: 13, marginBottom: 14 }}>
+              {String(character.roleName ?? roleLabel)} · {String(character.fieldOfStudy ?? "")} · {String(character.year ?? "")}
+            </p>
+            <p style={{ color: "var(--paper-dim)", fontSize: 14, lineHeight: 1.65, marginBottom: 16 }}>
+              {String(character.originStory ?? "")}
+            </p>
+            <div style={{ borderTop: "var(--stroke)", paddingTop: 14 }}>
+              <div className="text-label text-muted" style={{ marginBottom: 6 }}>Speciality</div>
+              <p style={{ color: "var(--paper-dim)", fontSize: 14, marginBottom: 14 }}>
+                {String(character.speciality ?? "")}
+              </p>
+              {traits.length > 0 && (
+                <>
+                  <div className="text-label text-muted" style={{ marginBottom: 8 }}>Traits</div>
+                  <ul style={{ listStyle: "none", display: "grid", gap: 8, marginBottom: 14 }}>
+                    {traits.map((trait) => (
+                      <li key={trait} style={{ color: "var(--paper-dim)", fontSize: 14 }}>◆ {trait}</li>
+                    ))}
+                  </ul>
+                </>
+              )}
+              <div className="text-label text-muted" style={{ marginBottom: 6 }}>Faction motto</div>
+              <p style={{ color: "var(--paper-dim)", fontSize: 14, fontStyle: "italic" }}>
+                “{String(character.motto ?? "")}”
+              </p>
+            </div>
+          </section>
+        )}
+
+        {characterError && (
+          <section className="card" role="status" style={{ padding: 14, marginBottom: 20 }}>
+            <p style={{ color: "var(--warning)", fontSize: 13 }}>
+              Your character dossier could not be loaded. Please try again later or contact a game warden.
+            </p>
+          </section>
+        )}
+
+        {!character && !characterError && (
+          <section className="card" style={{ padding: 14, marginBottom: 20 }}>
+            <p style={{ color: "var(--muted)", fontSize: 13 }}>
+              Your character dossier is not available yet. Contact a game warden if this seems incorrect.
+            </p>
+          </section>
+        )}
+
         {/* Privacy note */}
         <section className="card" style={{ padding: "14px 16px", marginBottom: 20 }}>
           <p style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.5 }}>
-            Your @aurak.ac.ae email is stored only for event management and will be deleted immediately after the event ends on 2026-11-23.
-            No character data or personal history is retained.
+            Your AURAK email and generated character dossier are stored for account access and event management. Ask a game warden about data deletion after the event.
           </p>
         </section>
 
@@ -127,4 +185,3 @@ export default function MeClient({ player }: { player: Record<string, unknown> }
     </main>
   );
 }
-

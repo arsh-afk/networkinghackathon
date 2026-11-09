@@ -1,24 +1,72 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 
 type Mode = "login" | "register";
+type CharacterInvitation = {
+  fullName: string;
+  roleName: string;
+  title: string;
+  tagline: string;
+  originStory: string;
+  speciality: string;
+  motto: string;
+  traits: string[];
+  fieldOfStudy: string;
+  year: string;
+  badgeCode: string;
+};
 
 export default function LoginForm() {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("login");
   const [loading, setLoading] = useState(false);
+  const [inviteLoading, setInviteLoading] = useState(false);
   const [error, setError] = useState("");
+  const [inviteToken, setInviteToken] = useState("");
+  const [email, setEmail] = useState("");
+  const [character, setCharacter] = useState<CharacterInvitation | null>(null);
   const pinRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.hash.slice(1)).get("invite");
+    if (!token) return;
+
+    setMode("register");
+    setInviteToken(token);
+    setInviteLoading(true);
+    window.history.replaceState(window.history.state, "", "/login?mode=register");
+
+    fetch("/api/auth/character", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ invite: token }),
+    })
+      .then(async (res) => {
+        const data = await res.json();
+        if (!res.ok || !data.ok) throw new Error(data.code || "This character link is invalid.");
+        setEmail(data.email);
+        setCharacter(data.character as CharacterInvitation);
+      })
+      .catch((err: unknown) => {
+        setError(err instanceof Error ? err.message : "Could not verify the character link.");
+      })
+      .finally(() => setInviteLoading(false));
+  }, []);
 
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
+    if (mode === "register" && (!inviteToken || !character)) {
+      setError("Open the registration link shared with you by a game warden first.");
+      return;
+    }
     setLoading(true);
 
     const fd = new FormData(e.currentTarget);
     const payload = Object.fromEntries(fd.entries());
+    if (mode === "register") payload.inviteToken = inviteToken;
 
     try {
       const res = await fetch(mode === "login" ? "/api/auth/login" : "/api/auth/register", {
@@ -44,21 +92,9 @@ export default function LoginForm() {
   }
 
   return (
-    <main
-      style={{
-        minHeight: "100dvh",
-        background: "var(--ink-950)",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: "24px 20px",
-        paddingTop: "calc(env(safe-area-inset-top, 0px) + 24px)",
-        paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 24px)",
-      }}
-    >
+    <main className="login-screen">
       {/* Logo area */}
-      <div style={{ textAlign: "center", marginBottom: 48 }}>
+      <div className="login-brand">
         <div
           className="font-display"
           style={{
@@ -91,13 +127,31 @@ export default function LoginForm() {
 
       {/* Card */}
       <div
-        className="card"
-        style={{
-          width: "100%",
-          maxWidth: 420,
-          padding: "24px 24px",
-        }}
+        className="card login-card"
       >
+        {inviteLoading && (
+          <div role="status" style={{ color: "var(--muted)", fontSize: 14, marginBottom: 16 }}>
+            Verifying your character invitation…
+          </div>
+        )}
+
+        {character && mode === "register" && (
+          <section className="card character-invitation" aria-label="Your character dossier">
+            <div className="text-label text-brass" style={{ marginBottom: 8 }}>
+              YOUR CHARACTER · #{character.badgeCode}
+            </div>
+            <h2 className="font-display" style={{ fontSize: 20, marginBottom: 4 }}>
+              {character.fullName}
+            </h2>
+            <p style={{ color: "var(--brass)", fontSize: 13, marginBottom: 10 }}>
+              {character.roleName} · {character.title}
+            </p>
+            <p style={{ color: "var(--paper-dim)", fontSize: 13, lineHeight: 1.5 }}>
+              {character.originStory}
+            </p>
+          </section>
+        )}
+
         {/* Mode toggle */}
         <div
           style={{
@@ -116,7 +170,7 @@ export default function LoginForm() {
               onClick={() => { setMode(m); setError(""); }}
               style={{
                 flex: 1,
-                minHeight: 40,
+                minHeight: 44,
                 border: "none",
                 borderRadius: "calc(var(--r-in) - 2px)",
                 background: mode === m ? "var(--ink-850)" : "transparent",
@@ -136,15 +190,17 @@ export default function LoginForm() {
         <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           {mode === "register" && (
             <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <span className="text-label text-muted">Display name</span>
+              <span className="text-label text-muted">Character name</span>
               <input
                 name="displayName"
                 className="input"
                 required
                 minLength={2}
                 maxLength={40}
-                placeholder="Layla Haddad"
+                placeholder="Your character name"
                 autoComplete="name"
+                value={character?.fullName ?? ""}
+                readOnly
               />
             </label>
           )}
@@ -159,6 +215,9 @@ export default function LoginForm() {
               placeholder="you@aurak.ac.ae"
               autoComplete="email"
               inputMode="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              readOnly={mode === "register" && Boolean(character)}
             />
           </label>
 
@@ -194,10 +253,16 @@ export default function LoginForm() {
             </div>
           )}
 
+          {mode === "register" && !inviteToken && (
+            <p style={{ color: "var(--muted)", fontSize: 13, lineHeight: 1.5 }}>
+              A game warden will share your character registration link with you. Open that link before creating your account.
+            </p>
+          )}
+
           <button
             type="submit"
             className="btn btn-primary btn-full"
-            disabled={loading}
+            disabled={loading || inviteLoading || (mode === "register" && !character)}
             style={{ marginTop: 4 }}
           >
             {loading ? "…" : mode === "login" ? "Enter the ledger" : "Register"}

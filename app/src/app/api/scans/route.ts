@@ -28,7 +28,10 @@ export async function POST(req: NextRequest) {
     return err("BAD_BADGE", "No such mark in the ledger. Check the digits.");
   }
 
-  const clientUuid = body.clientUuid ?? crypto.randomUUID();
+  const clientUuid = typeof body.clientUuid === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.clientUuid)
+    ? body.clientUuid
+    : crypto.randomUUID();
   const via = ["qr", "code", "admin"].includes(body.via ?? "") ? body.via : "qr";
 
   const db = getServiceSupabase();
@@ -48,7 +51,10 @@ export async function POST(req: NextRequest) {
     p_via: via,
   });
 
-  if (error) return err("DB_ERROR", "The ledger did not answer. Nothing was lost.", 500);
+  if (error) {
+    console.error("[scans] rpc_scan failed:", error.message, error.code);
+    return err("DB_ERROR", "The ledger did not answer. Nothing was lost.", 500);
+  }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rpcData = data as any;
   if (!rpcData?.ok) return NextResponse.json(rpcData, { status: rpcData?.code === "LOCKED" ? 423 : 409 });

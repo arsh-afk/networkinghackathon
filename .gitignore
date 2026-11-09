@@ -4,6 +4,7 @@
 **/out/
 **/build/
 **/coverage/
+**/.dev-db.json
 
 # Local environment and credentials
 .env
@@ -16,6 +17,12 @@
 
 # Local workspace metadata
 .freebuff/
+
+# Role-builder intake data contains personal information
+role-builder/data/intake.csv
+role-builder/data/registry.json
+role-builder/data/registration-invitations.csv
+role-builder/data/characters/
 
 # Logs and generated TypeScript state
 npm-debug.log*

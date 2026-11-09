@@ -103,12 +103,7 @@ export default function DeckClient({ player, todayCount, totalPoints, totalConne
 
   return (
     <main
-      style={{
-        minHeight: "100dvh",
-        background: "var(--ink-950)",
-        paddingTop: "env(safe-area-inset-top, 0px)",
-        paddingBottom: "calc(72px + env(safe-area-inset-bottom, 0px))",
-      }}
+      className="app-screen"
     >
       {/* Header */}
       <header
@@ -116,7 +111,6 @@ export default function DeckClient({ player, todayCount, totalPoints, totalConne
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          padding: "12px 20px",
           borderBottom: "var(--stroke)",
         }}
       >

@@ -17,7 +17,11 @@ export async function POST(req: NextRequest) {
   const password = String(b.password ?? "");
   if (!username || !password) return unauthorized();
 
-  const { count } = await db.from("admin_users").select("id", { count: "exact", head: true });
+  const { count, error: countError } = await db.from("admin_users").select("id", { count: "exact", head: true });
+  if (countError) {
+    console.error("[admin/login] Could not query admin users:", countError.message);
+    return NextResponse.json({ ok: false, code: "ADMIN_DB_NOT_READY" }, { status: 503 });
+  }
   if ((count ?? 0) === 0) {
     const bu = process.env.ADMIN_BOOTSTRAP_USERNAME || "Arsh";
     const bp = process.env.ADMIN_BOOTSTRAP_PASSWORD || "";

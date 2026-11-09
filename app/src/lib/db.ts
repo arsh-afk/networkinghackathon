@@ -1,7 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 
 export function devNoDbEnabled() {
-  return process.env.NODE_ENV !== "production" && process.env.DEV_NO_DB === "true";
+  const supabaseConfigured = Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+  return process.env.NODE_ENV !== "production" && process.env.DEV_NO_DB === "true" && !supabaseConfigured;
 }
 
 /** Server-only data client. Prefers Supabase; can use DEV_NO_DB in-memory fallback (never production). */
@@ -23,4 +24,3 @@ export function getServiceSupabase() {
 export function dbConfigured() {
   return Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) || devNoDbEnabled();
 }
-

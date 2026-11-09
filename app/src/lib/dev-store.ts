@@ -3,15 +3,41 @@
  * NOT for production. No RLS, no SQL constraints, in-memory (globalThis) — data resets on server restart.
  */
 import crypto from "node:crypto";
+import fs from "node:fs";
+import path from "node:path";
 
 type Row = Record<string, unknown>;
 type TableName = string;
 
 type DbState = { tables: Record<TableName, Row[]>; seq: number };
 
+const DB_FILE = path.resolve(process.cwd(), ".dev-db.json");
+
+function loadState(): DbState {
+  try {
+    if (fs.existsSync(DB_FILE)) {
+      const content = fs.readFileSync(DB_FILE, "utf-8");
+      return JSON.parse(content) as DbState;
+    }
+  } catch {
+    // fallback to empty
+  }
+  return { tables: {}, seq: 1 };
+}
+
+function saveState(s: DbState) {
+  try {
+    fs.writeFileSync(DB_FILE, JSON.stringify(s, null, 2), "utf-8");
+  } catch {
+    // ignore in environments without write access
+  }
+}
+
 function state(): DbState {
   const g = globalThis as typeof globalThis & { __saDevDb?: DbState };
-  if (!g.__saDevDb) g.__saDevDb = { tables: {}, seq: 1 };
+  if (!g.__saDevDb) {
+    g.__saDevDb = loadState();
+  }
   return g.__saDevDb;
 }
 function table(name: string) { const s = state(); (s.tables[name] ??= []); return s.tables[name]; }
@@ -57,12 +83,14 @@ class Query {
         });
         const err = inserted.find((r) => (r as Row).__err) as { __err: { message: string; code: string } } | undefined;
         if (err) return { data: null, error: err.__err };
+        saveState(state());
         if (this._selectCols && this._selectCols !== "*") return { data: must ? inserted[0] : inserted, error: null };
         return { data: must ? inserted[0] : (maybe ? inserted[0] ?? null : inserted), error: null };
       }
       if (this.op === "update") {
         let n = 0; const patch = (this.rows || [])[0] || {};
         for (const r of t) if (match(r)) { Object.assign(r, patch); n++; }
+        saveState(state());
         return { data: n, error: null };
       }
       let res = t.filter(match);

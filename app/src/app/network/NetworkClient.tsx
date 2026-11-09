@@ -26,15 +26,10 @@ export default function NetworkClient({ connections }: { connections: Connection
 
   return (
     <main
-      style={{
-        minHeight: "100dvh",
-        background: "var(--ink-950)",
-        paddingTop: "env(safe-area-inset-top, 0px)",
-        paddingBottom: "calc(72px + env(safe-area-inset-bottom, 0px))",
-      }}
+      className="app-screen"
     >
       {/* Header */}
-      <header style={{ padding: "16px 20px", borderBottom: "var(--stroke)" }}>
+      <header style={{ borderBottom: "var(--stroke)" }}>
         <h1 className="font-display text-label text-brass" style={{ letterSpacing: "0.1em" }}>
           YOUR NETWORK ({connections.length})
         </h1>
@@ -61,7 +56,7 @@ export default function NetworkClient({ connections }: { connections: Connection
               role="tab"
               aria-selected={isSelected}
               style={{
-                minHeight: 32,
+                minHeight: 44,
                 padding: "0 12px",
                 borderRadius: "var(--r-pill)",
                 border: "none",
@@ -159,4 +154,3 @@ export default function NetworkClient({ connections }: { connections: Connection
     </main>
   );
 }
-
