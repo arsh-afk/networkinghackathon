@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Cinzel, Inter, JetBrains_Mono } from "next/font/google";
+import { PresenceHeartbeat } from "@/components/PresenceHeartbeat";
 import "./globals.css";
 
 const cinzel = Cinzel({
@@ -40,6 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${cinzel.variable} ${inter.variable} ${jetbrainsMono.variable}`}>
       <body>
         <div className="noise-overlay" aria-hidden="true" />
+        <PresenceHeartbeat />
         {children}
       </body>
     </html>

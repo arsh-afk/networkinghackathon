@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { cookieName, readSessionByToken } from "@/lib/session";
 import { getServiceSupabase } from "@/lib/db";
-import { gameDayFor, tierMultiplier, DEFAULT_CONFIG, type Role } from "@/lib/scoring";
+import { calculateScores, gameDayFor, loadScoringConfig, type ScoreScan } from "@/lib/scoring";
 
 export const dynamic = "force-dynamic";
 
@@ -13,101 +13,63 @@ export async function GET() {
 
   const db = getServiceSupabase();
   if (!db) return NextResponse.json({ ok: false, code: "DB_ERROR" }, { status: 503 });
+  const config = await loadScoringConfig();
+  const gameDay = gameDayFor(new Date(), config.day_rollover_h, config.tz);
+  const playerId = String(player.id);
 
-  const { pin_hash: _, ...safe } = player as Record<string, unknown> & { pin_hash?: string };
-  void _;
-
-  const gameDay = gameDayFor(new Date(), 0, "Asia/Dubai");
-
-  // Today's scans as scanner
-  const { data: todayScans } = await db
-    .from("scans")
-    .select("id,base_points,game_day,receiver_id")
-    .eq("scanner_id", player.id as string)
-    .eq("game_day", gameDay);
-
-  const activeTodayScans = ((todayScans as Array<Record<string, unknown>>) ?? []).filter(
-    (s) => !s.voided_at
-  );
-  const todayCount = activeTodayScans.length;
-
-  // Today's total points (approximate without diversity mult for quick display)
-  let todayRawPts = 0;
-  activeTodayScans.forEach((s, i) => {
-    const mult = tierMultiplier(i + 1, DEFAULT_CONFIG);
-    todayRawPts += (Number(s.base_points) || 3) * mult;
-  });
-
-  // Current tier
-  const currentTier =
-    todayCount < DEFAULT_CONFIG.tier1_n ? 1
-    : todayCount < DEFAULT_CONFIG.tier2_n ? 2
-    : 3;
-  const nextTierRung = currentTier === 1 ? DEFAULT_CONFIG.tier1_n + 1 : currentTier === 2 ? DEFAULT_CONFIG.tier2_n + 1 : null;
-
-  // All-time scan points (rough total without diversity)
-  const { data: allScans } = await db
-    .from("scans")
-    .select("id,base_points,game_day,scanner_id,receiver_id,voided_at")
-    .eq("scanner_id", player.id as string);
-
-  const liveScans = ((allScans as Array<Record<string, unknown>>) ?? []).filter(s => !s.voided_at);
-  
-  // Group by day for total scoring
-  const byDay = new Map<string, typeof liveScans>();
-  for (const s of liveScans) {
-    const day = s.game_day as string;
-    if (!byDay.has(day)) byDay.set(day, []);
-    byDay.get(day)!.push(s);
+  const { data: rawScans, error: scansError } = await db.from("scans")
+    .select("id,scanner_id,receiver_id,base_points,game_day,created_at,voided_at")
+    .or(`scanner_id.eq.${playerId},receiver_id.eq.${playerId}`)
+    .order("created_at", { ascending: true })
+    .range(0, 9999);
+  if (scansError) {
+    console.error("[me] Could not load player score history:", scansError.message);
+    return NextResponse.json({ ok: false, code: "SCORE_QUERY_FAILED" }, { status: 500 });
   }
-  
-  let totalScanPts = 0;
-  for (const dayScansList of byDay.values()) {
-    for (let i = 0; i < dayScansList.length; i++) {
-      const mult = tierMultiplier(i + 1, DEFAULT_CONFIG);
-      totalScanPts += (Number(dayScansList[i].base_points) || 3) * mult;
-    }
+  const rows = rawScans as Array<Record<string, unknown>> ?? [];
+  const relatedIds = [...new Set(rows.flatMap((scan) => [String(scan.scanner_id), String(scan.receiver_id)]))];
+  const { data: relatedPlayers, error: playersError } = relatedIds.length
+    ? await db.from("players").select("id,role").in("id", relatedIds)
+    : { data: [], error: null };
+  if (playersError) {
+    console.error("[me] Could not load score role data:", playersError.message);
+    return NextResponse.json({ ok: false, code: "SCORE_QUERY_FAILED" }, { status: 500 });
   }
+  const scorePlayers = (relatedPlayers ?? []).map((row) => ({ id: String(row.id), role: String(row.role) }));
+  const scoreScans: ScoreScan[] = rows.map((scan) => ({
+    id: String(scan.id),
+    scanner_id: String(scan.scanner_id),
+    receiver_id: String(scan.receiver_id),
+    base_points: Number(scan.base_points) || 0,
+    game_day: String(scan.game_day ?? "all"),
+    created_at: String(scan.created_at ?? ""),
+    voided_at: typeof scan.voided_at === "string" ? scan.voided_at : null,
+  }));
+  const scores = calculateScores(scorePlayers, scoreScans, config);
+  const score = scores.get(playerId) ?? { scanPoints: 0, receivePoints: 0, taskPoints: 0, total: 0, scans: 0 };
+  const todayScans = scoreScans.filter((scan) => scan.scanner_id === playerId && scan.game_day === gameDay && !scan.voided_at);
+  const todayScores = calculateScores(scorePlayers, todayScans, config).get(playerId);
+  const currentTier = todayScans.length < config.tier1_n ? 1 : todayScans.length < config.tier2_n ? 2 : 3;
+  const nextTierRung = currentTier === 1 ? config.tier1_n + 1 : currentTier === 2 ? config.tier2_n + 1 : null;
 
-  // Received points
-  const { data: received } = await db
-    .from("scans")
-    .select("id,game_day,voided_at")
-    .eq("receiver_id", player.id as string);
-  
-  const liveReceived = ((received as Array<Record<string, unknown>>) ?? []).filter(s => !s.voided_at);
-  const receivedByDay = new Map<string, number>();
-  for (const s of liveReceived) {
-    const day = s.game_day as string;
-    receivedByDay.set(day, (receivedByDay.get(day) ?? 0) + 1);
-  }
-  let receivePts = 0;
-  for (const count of receivedByDay.values()) {
-    receivePts += Math.min(count, DEFAULT_CONFIG.receive_cap);
-  }
-
-  const totalPoints = Math.round((totalScanPts + receivePts) * 100) / 100;
-  const totalConnections = liveScans.length + liveReceived.length;
-
+  const { pin_hash: _pinHash, ...safePlayer } = player as Record<string, unknown> & { pin_hash?: string };
+  void _pinHash;
   return NextResponse.json({
     ok: true,
-    player: {
-      ...safe,
-      role: safe.role as Role,
-    },
+    player: safePlayer,
     today: {
-      scan_count: todayCount,
+      scan_count: todayScans.length,
       current_tier: currentTier,
       next_tier_at_rung: nextTierRung,
-      raw_scan_pts: Math.round(todayRawPts * 100) / 100,
+      raw_scan_pts: todayScores?.scanPoints ?? 0,
       game_day: gameDay,
     },
     totals: {
-      scan_pts: Math.round(totalScanPts * 100) / 100,
-      receive_pts: receivePts,
-      total: totalPoints,
-      connections: totalConnections,
+      scan_pts: score.scanPoints,
+      receive_pts: score.receivePoints,
+      task_pts: score.taskPoints,
+      total: score.total,
+      connections: scoreScans.filter((scan) => !scan.voided_at && (scan.scanner_id === playerId || scan.receiver_id === playerId)).length,
     },
   });
 }
-

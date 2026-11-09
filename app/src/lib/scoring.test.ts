@@ -16,7 +16,7 @@
  * Distinct roles: Weaver, Patron, Artificer, Broker = 4 distinct roles -> diversity mult x1.25
  */
 
-import { baseScanPoints, tierMultiplier, diversityMultiplier, type Role } from "./scoring";
+import { baseScanPoints, calculateScores, tierMultiplier, diversityMultiplier, type Role, type ScoreScan } from "./scoring";
 
 function assertEqual(actual: number, expected: number, msg: string) {
   if (Math.abs(actual - expected) > 0.001) {
@@ -90,4 +90,18 @@ assertEqual(divMult, 1.25, "Aria diversity mult");
 const finalScanPts = weightedTotal * divMult;
 assertEqual(finalScanPts, 52.5, "Aria final scan points for the day (42.0 * 1.25 = 52.50)");
 
+console.log("\n5. Configurable warden scoring:");
+const managedScans: ScoreScan[] = [
+  { id: "1", scanner_id: "a", receiver_id: "d", base_points: 3, game_day: "2026-11-16", created_at: "2026-11-16T08:00:00Z" },
+  { id: "2", scanner_id: "a", receiver_id: "b", base_points: 5, game_day: "2026-11-16", created_at: "2026-11-16T08:01:00Z" },
+  { id: "3", scanner_id: "a", receiver_id: "c", base_points: 6, game_day: "2026-11-16", created_at: "2026-11-16T08:02:00Z" },
+];
+const managedScores = calculateScores([
+  { id: "a", role: "broker" }, { id: "b", role: "weaver" }, { id: "c", role: "patron" }, { id: "d", role: "broker" },
+], managedScans);
+const managedAria = managedScores.get("a");
+assertEqual(managedAria?.scanPoints ?? 0, 17.5, "Configured diversity-weighted scan score");
+assertEqual(managedAria?.taskPoints ?? 0, 3, "Configured first Patron Touch award");
+assertEqual(managedAria?.total ?? 0, 20.5, "Configured total includes scan and task points");
+assertEqual(managedScores.get("c")?.receivePoints ?? 0, 1, "Receiver points");
 console.log("\n✅ ALL SCORING ASSERTIONS PASSED!");

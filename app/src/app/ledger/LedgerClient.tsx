@@ -20,6 +20,7 @@ type Props = {
   daysMap: Record<string, ScanEntry[]>;
   totalScanPts: number;
   totalReceivedPts: number;
+  taskPts: number;
 };
 
 export default function LedgerClient({
@@ -27,6 +28,7 @@ export default function LedgerClient({
   daysMap,
   totalScanPts,
   totalReceivedPts,
+  taskPts,
 }: Props) {
   const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>(() => {
     // Expand all days by default
@@ -37,7 +39,7 @@ export default function LedgerClient({
     return init;
   });
 
-  const grandTotal = Math.round((totalScanPts + totalReceivedPts) * 100) / 100;
+  const grandTotal = Math.round((totalScanPts + totalReceivedPts + taskPts) * 100) / 100;
   const days = Object.keys(daysMap).sort().reverse();
 
   const toggleDay = (d: string) => {
@@ -97,6 +99,12 @@ export default function LedgerClient({
               <span style={{ fontSize: 14, color: "var(--paper-dim)" }}>Received marks (+1 each, capped)</span>
               <span className="font-num" style={{ fontSize: 16, color: "var(--paper)" }}>
                 +{totalReceivedPts.toFixed(2)}
+              </span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 14, color: "var(--paper-dim)" }}>Patron Touch bonuses</span>
+              <span className="font-num" style={{ fontSize: 16, color: "var(--paper)" }}>
+                +{taskPts.toFixed(2)}
               </span>
             </div>
           </div>

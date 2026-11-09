@@ -27,6 +27,7 @@ Supabase hosts the PostgreSQL database where players, admin accounts, scans, and
    - `supabase/migrations/0001_initial_skeleton.sql`
    - `supabase/migrations/0002_complete_production_setup.sql`
    - `supabase/migrations/0003_character_dossiers.sql`
+   - `supabase/migrations/0004_warden_dashboard.sql`
 3. In **Project Settings → API** (or **API Keys**), copy the **Project URL** and the **service role/secret key**. The service key is private: use it only in server environment settings, never browser code or public client variables.
 4. Put those values into `app/.env.local` for local work, or into your hosting provider's server-side environment variables for the deployed app. The file should contain entries like these (with your real values):
 ```text
@@ -45,20 +46,24 @@ Replace the example values; do not commit `.env.local`. Your local `.env.local` 
 
 The role-builder writes private `.txt` dossiers locally and syncs generated character records to `character_dossiers`. It must use the **same** Supabase URL and service-role key as the app. It creates registration links in a private CSV for you to share yourself; it does not send email. Never commit intake CSVs, registry exports, invitation links, or character text files.
 
+Migration 0004 adds player-session heartbeats and the audited, atomic game-configuration update function used by the warden console. Re-run the remaining migration if upgrading an existing database; do not skip it.
+
 - App: `http://localhost:3000`
 - Health: `http://localhost:3000/api/health`
 - Player auth: `/login` (AURAK `@aurak.ac.ae` + 6-digit PIN)
 - Player deck (after login): `/deck`, `/scan`
 - **Hidden game-warden portal (A8):** `/warden/<ADMIN_PORTAL_SECRET_PATH>` — replace the placeholder with the exact value configured in the app environment, then sign in with the bootstrap username/password. The first successful login creates the bootstrap admin only if the `admin_users` table has no accounts yet. If it already has an account, use that account's password instead.
 
+The warden command center includes live player presence (a session heartbeat within five minutes), game/event scoring controls, player search and account actions, moderation queues, administrator management, audit history, and a private network explorer. Graph views can be filtered by date/faction/player, saved as historical or final snapshots, and exported as audited CSV/PNG. Apply game-configuration changes only after confirming the preview; active scoring values feed the scan, deck, ledger, and arena calculations. CSV/PNG exports include player identities, so keep downloaded files private.
+
 
 ## Key files
 
 - `src/app/api/auth/*` — player register/login/me/logout
-- `src/app/api/admin/*` — admin login/me/users/conflicts (session-protected)
+- `src/app/api/admin/*` — session-protected warden overview, configuration, graph, player, review, admin, and audit APIs
 - `src/app/warden/[secret]/` — hidden portal entry (404 if secret mismatch)
 - `src/lib/*` — Supabase service client, crypto, validation, sessions, badge parser, decisions
-- `supabase/migrations/` — apply schema and RPC migrations in filename order
+- `supabase/migrations/` — apply schema and RPC migrations in filename order (through 0004)
 - `../plan/APPLIED-DECISIONS.md` — applied product decisions
 
 ## Applied decisions reflected

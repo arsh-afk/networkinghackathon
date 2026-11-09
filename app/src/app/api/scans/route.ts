@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { cookieName, readSessionByToken } from "@/lib/session";
 import { getServiceSupabase, devNoDbEnabled } from "@/lib/db";
 import { parseBadgeText } from "@/lib/badge";
-import { buildScanBreakdown, gameDayFor, DEFAULT_CONFIG, type Role } from "@/lib/scoring";
+import { buildScanBreakdown, gameDayFor, loadScoringConfig, type Role } from "@/lib/scoring";
 import crypto from "node:crypto";
 
 export const dynamic = "force-dynamic";
@@ -38,8 +38,9 @@ export async function POST(req: NextRequest) {
   if (!db) return err("DB_ERROR", "Database not configured.", 503);
 
   if (devNoDbEnabled()) {
+    const config = await loadScoringConfig();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return handleDevScan({ db: db as any, player, rawCode, clientUuid, via: via as string });
+    return handleDevScan({ db: db as any, player, rawCode, clientUuid, via: via as string, config });
   }
 
   // Production: call rpc_scan
@@ -63,7 +64,7 @@ export async function POST(req: NextRequest) {
 
 // --------------- DEV_NO_DB path ---------------
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function handleDevScan({ db, player, rawCode, clientUuid, via }: { db: any; player: Record<string, unknown>; rawCode: string; clientUuid: string; via: string }) {
+async function handleDevScan({ db, player, rawCode, clientUuid, via, config }: { db: any; player: Record<string, unknown>; rawCode: string; clientUuid: string; via: string; config: Awaited<ReturnType<typeof loadScoringConfig>> }) {
   const me = player as { id: string; role: Role; display_name: string };
 
   // Phase check (simple: always 'live' in dev)
@@ -89,7 +90,7 @@ async function handleDevScan({ db, player, rawCode, clientUuid, via }: { db: any
   );
   if (alreadyPaired) return NextResponse.json({ ok: false, code: "ALREADY_PAIRED", message: "You already hold this thread." }, { status: 409 });
 
-  const gameDay = gameDayFor(new Date(), 0, "Asia/Dubai");
+  const gameDay = gameDayFor(new Date(), config.day_rollover_h, config.tz);
 
   // Count today's scans for seq
   const todayScans = (allScans ?? []).filter((s: Record<string, unknown>) =>
@@ -102,7 +103,7 @@ async function handleDevScan({ db, player, rawCode, clientUuid, via }: { db: any
     id: scanId,
     scanner_id: me.id,
     receiver_id: them.id,
-    base_points: 3 + (them.role !== me.role ? 2 : 0) + (them.role === "patron" ? 1 : 0),
+    base_points: 3 + (them.role !== me.role ? 2 : 0) + (them.role === "patron" ? config.patron_scan_bonus : 0),
     game_day: gameDay,
     client_uuid: clientUuid,
     via,
@@ -113,7 +114,7 @@ async function handleDevScan({ db, player, rawCode, clientUuid, via }: { db: any
     receiver: { display_name: them.display_name, role: them.role as Role, descriptor: them.descriptor },
     seq,
     scanId,
-    cfg: DEFAULT_CONFIG,
+    cfg: config,
   });
 
   return NextResponse.json(breakdown);

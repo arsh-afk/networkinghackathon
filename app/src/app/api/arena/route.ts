@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServiceSupabase } from "@/lib/db";
-import { tierMultiplier, DEFAULT_CONFIG } from "@/lib/scoring";
+import { calculateScores, loadScoringConfig, type ScoreScan } from "@/lib/scoring";
 
 export const dynamic = "force-dynamic";
 
@@ -9,53 +9,52 @@ export async function GET() {
   if (!db) {
     return NextResponse.json({ ok: false, error: "Database not configured" }, { status: 503 });
   }
+  const config = await loadScoringConfig();
 
   // Fetch all active players
-  const { data: playersData } = await db
+  const { data: playersData, error: playersError } = await db
     .from("players")
     .select("id,display_name,role,badge_code,is_active");
+  if (playersError) {
+    console.error("[arena] Could not load players:", playersError.message);
+    return NextResponse.json({ ok: false, error: "Could not load arena players." }, { status: 500 });
+  }
   const players = (playersData as Array<Record<string, unknown>> ?? []).filter(p => p.is_active);
 
   // Fetch all live scans
-  const { data: scansData } = await db
+  const { data: scansData, error: scansError } = await db
     .from("scans")
-    .select("id,scanner_id,receiver_id,base_points,game_day,voided_at");
-  const liveScans = (scansData as Array<Record<string, unknown>> ?? []).filter(s => !s.voided_at);
+    .select("id,scanner_id,receiver_id,base_points,game_day,created_at,voided_at");
+  if (scansError) {
+    console.error("[arena] Could not load scans:", scansError.message);
+    return NextResponse.json({ ok: false, error: "Could not load arena scores." }, { status: 500 });
+  }
+  const allScans = (scansData as Array<Record<string, unknown>> ?? []);
+  const liveScans = allScans.filter(s => !s.voided_at);
 
-  // Compute scores per player
+  const scoreScanRows: ScoreScan[] = liveScans.map((scan) => ({
+    id: String(scan.id),
+    scanner_id: String(scan.scanner_id),
+    receiver_id: String(scan.receiver_id),
+    base_points: Number(scan.base_points) || 0,
+    game_day: String(scan.game_day ?? "all"),
+    created_at: String(scan.created_at ?? ""),
+  }));
+  const scores = calculateScores(
+    players.map((player) => ({ id: String(player.id), role: String(player.role ?? "artificer") })),
+    scoreScanRows,
+    config,
+  );
   const playerScores: Record<string, { id: string; name: string; role: string; score: number; scans: number }> = {};
   for (const p of players) {
+    const computed = scores.get(String(p.id));
     playerScores[p.id as string] = {
       id: p.id as string,
       name: (p.display_name as string) || "Agent",
       role: (p.role as string) || "artificer",
-      score: 0,
-      scans: 0,
+      score: computed?.total ?? 0,
+      scans: computed?.scans ?? 0,
     };
-  }
-
-  // Group scans by scanner & day for diminishing returns
-  const scannerDays: Record<string, Record<string, number>> = {};
-  for (const s of liveScans) {
-    const sId = s.scanner_id as string;
-    const day = (s.game_day as string) || "all";
-    if (!scannerDays[sId]) scannerDays[sId] = {};
-    const seq = (scannerDays[sId][day] ?? 0) + 1;
-    scannerDays[sId][day] = seq;
-
-    const mult = tierMultiplier(seq, DEFAULT_CONFIG);
-    const pts = (Number(s.base_points) || 3) * mult;
-
-    if (playerScores[sId]) {
-      playerScores[sId].score += pts;
-      playerScores[sId].scans += 1;
-    }
-
-    // Receiver gets +1 (subject to 8/day cap)
-    const rId = s.receiver_id as string;
-    if (playerScores[rId]) {
-      playerScores[rId].score += 1;
-    }
   }
 
   // Sort players by score descending
@@ -106,4 +105,3 @@ export async function GET() {
     updatedAt: new Date().toISOString(),
   });
 }
-

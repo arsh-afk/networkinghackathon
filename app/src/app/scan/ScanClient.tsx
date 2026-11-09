@@ -2,7 +2,23 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
+import jsQR from "jsqr";
 import { parseBadgeText } from "@/lib/badge";
+
+function safeRandomUUID(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    try {
+      return crypto.randomUUID();
+    } catch {
+      // fallback in non-secure context
+    }
+  }
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
 
 type ScanResult = {
   ok: true;
@@ -209,7 +225,6 @@ export default function ScanClient({ player }: { player: Record<string, unknown>
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const scanningRef = useRef(false);
-  const clientUuidRef = useRef<string>(crypto.randomUUID());
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -242,33 +257,59 @@ export default function ScanClient({ player }: { player: Record<string, unknown>
     return stopCamera;
   }, [state.kind, startCamera, stopCamera]);
 
-  // BarcodeDetector scanning loop
+  // Universal QR scanning loop (BarcodeDetector with jsQR fallback for Safari/iOS)
   useEffect(() => {
     if (state.kind !== "scanning" || cameraError) return;
-    if (!("BarcodeDetector" in window)) return; // fallback to zxing (not loaded here)
-
-    // @ts-expect-error BarcodeDetector is not in lib types
-    const detector = new BarcodeDetector({ formats: ["qr_code"] });
     let cancelled = false;
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const win = typeof window !== "undefined" ? (window as any) : null;
+    const detector = win && "BarcodeDetector" in win ? new win.BarcodeDetector({ formats: ["qr_code"] }) : null;
 
     const scan = async () => {
       if (cancelled || !videoRef.current || scanningRef.current) return;
-      if (videoRef.current.readyState < 2) {
-        setTimeout(scan, 200);
-        return;
-      }
-      try {
-        const barcodes = await detector.detect(videoRef.current);
-        if (barcodes.length > 0 && !scanningRef.current) {
-          const raw = barcodes[0].rawValue as string;
-          const parsed = parseBadgeText(raw);
-          if (parsed) {
-            scanningRef.current = true;
-            await submitScan({ code: parsed.code, via: "qr" });
+      const video = videoRef.current;
+      if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
+        try {
+          let detectedText: string | null = null;
+          if (detector) {
+            try {
+              const barcodes = await detector.detect(video);
+              if (barcodes.length > 0) {
+                detectedText = barcodes[0].rawValue as string;
+              }
+            } catch {
+              // fallback to jsQR
+            }
           }
+
+          if (!detectedText && ctx) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const code = jsQR(imgData.data, imgData.width, imgData.height, {
+              inversionAttempts: "dontInvert",
+            });
+            if (code && code.data) {
+              detectedText = code.data;
+            }
+          }
+
+          if (detectedText && !scanningRef.current) {
+            const parsed = parseBadgeText(detectedText);
+            if (parsed) {
+              scanningRef.current = true;
+              await submitScan({ code: parsed.code, via: "qr" });
+            }
+          }
+        } catch {
+          // ignore transient frame capture errors
         }
-      } catch { /* detect error, keep going */ }
-      if (!cancelled) setTimeout(scan, 500);
+      }
+      if (!cancelled) setTimeout(scan, 200);
     };
 
     scan();
@@ -279,10 +320,11 @@ export default function ScanClient({ player }: { player: Record<string, unknown>
     if (submitting) return;
     setSubmitting(true);
     try {
+      const clientUuid = safeRandomUUID();
       const res = await fetch("/api/scans", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code, via, clientUuid: clientUuidRef.current }),
+        body: JSON.stringify({ code, via, clientUuid }),
       });
       const data = await res.json() as ScanResult | ScanError;
       if (data.ok) {
@@ -312,8 +354,6 @@ export default function ScanClient({ player }: { player: Record<string, unknown>
   function resetScan() {
     setState({ kind: "scanning" });
     scanningRef.current = false;
-    // New client UUID for next scan
-    clientUuidRef.current = crypto.randomUUID();
   }
 
   const role = (player.role as string | undefined)?.toLowerCase() ?? "artificer";
