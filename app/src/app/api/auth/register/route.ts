@@ -47,10 +47,14 @@ export async function POST(req: NextRequest) {
     badgeCode?: unknown;
     role?: unknown;
   } | null;
-  const displayName = typeof character?.fullName === "string" ? character.fullName.trim().slice(0, 40) : "";
+  const invitedName = typeof character?.fullName === "string" ? character.fullName.trim().slice(0, 40) : "";
+  const displayName = typeof b.displayName === "string" ? b.displayName.trim() : invitedName;
   const badgeCode = typeof character?.badgeCode === "string" ? character.badgeCode : "";
   const role = typeof character?.role === "string" ? character.role : "";
-  if (displayName.length < 2 || !/^\d{6}$/.test(badgeCode) || !ROLES.includes(role as typeof ROLES[number])) {
+  if (displayName.length < 2 || displayName.length > 40) {
+    return NextResponse.json({ ok: false, code: "INVALID_NAME", message: "Character name must be between 2 and 40 characters." }, { status: 400 });
+  }
+  if (invitedName.length < 2 || !/^\d{6}$/.test(badgeCode) || !ROLES.includes(role as typeof ROLES[number])) {
     console.error("[auth/register] Character dossier is missing required account fields.");
     return NextResponse.json({ ok: false, code: "INVALID_CHARACTER" }, { status: 500 });
   }

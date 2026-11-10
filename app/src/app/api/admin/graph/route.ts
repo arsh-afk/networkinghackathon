@@ -60,6 +60,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: true, graph, updatedAt: new Date().toISOString() }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     console.error("[admin/graph] Could not build graph:", error);
+    if (error instanceof Error && /last_seen_at/i.test(error.message)) {
+      return NextResponse.json({
+        ok: false,
+        code: "MIGRATION_REQUIRED",
+        message: "The warden database update is missing. Run supabase/migrations/0004_warden_dashboard.sql in the Supabase SQL Editor, then reload.",
+      }, { status: 503 });
+    }
     return NextResponse.json({ ok: false, code: "GRAPH_QUERY_FAILED" }, { status: 500 });
   }
 }

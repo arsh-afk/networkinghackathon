@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import jsQR from "jsqr";
+import type { IScannerControls } from "@zxing/browser";
 import { parseBadgeText } from "@/lib/badge";
 
 function safeRandomUUID(): string {
@@ -222,99 +222,53 @@ export default function ScanClient({ player }: { player: Record<string, unknown>
   const [manualCode, setManualCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [cameraError, setCameraError] = useState("");
+  const [cameraAttempt, setCameraAttempt] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
   const scanningRef = useRef(false);
 
-  const stopCamera = useCallback(() => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
-      streamRef.current = null;
-    }
-  }, []);
-
-  const startCamera = useCallback(async () => {
-    if (!videoRef.current) return;
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
-      });
-      streamRef.current = stream;
-      videoRef.current.srcObject = stream;
-      await videoRef.current.play();
-      setCameraError("");
-    } catch {
-      setCameraError("Camera not available. Use the code entry below.");
-    }
-  }, []);
-
   useEffect(() => {
-    if (state.kind === "scanning") {
-      startCamera();
-    } else {
-      stopCamera();
-    }
-    return stopCamera;
-  }, [state.kind, startCamera, stopCamera]);
-
-  // Universal QR scanning loop (BarcodeDetector with jsQR fallback for Safari/iOS)
-  useEffect(() => {
-    if (state.kind !== "scanning" || cameraError) return;
+    if (state.kind !== "scanning") return;
     let cancelled = false;
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    let controls: IScannerControls | null = null;
+    const videoElement = videoRef.current;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const win = typeof window !== "undefined" ? (window as any) : null;
-    const detector = win && "BarcodeDetector" in win ? new win.BarcodeDetector({ formats: ["qr_code"] }) : null;
-
-    const scan = async () => {
-      if (cancelled || !videoRef.current || scanningRef.current) return;
-      const video = videoRef.current;
-      if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
-        try {
-          let detectedText: string | null = null;
-          if (detector) {
-            try {
-              const barcodes = await detector.detect(video);
-              if (barcodes.length > 0) {
-                detectedText = barcodes[0].rawValue as string;
-              }
-            } catch {
-              // fallback to jsQR
-            }
-          }
-
-          if (!detectedText && ctx) {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const code = jsQR(imgData.data, imgData.width, imgData.height, {
-              inversionAttempts: "dontInvert",
-            });
-            if (code && code.data) {
-              detectedText = code.data;
-            }
-          }
-
-          if (detectedText && !scanningRef.current) {
-            const parsed = parseBadgeText(detectedText);
-            if (parsed) {
-              scanningRef.current = true;
-              await submitScan({ code: parsed.code, via: "qr" });
-            }
-          }
-        } catch {
-          // ignore transient frame capture errors
+    async function startScanner() {
+      setCameraError("");
+      try {
+        if (!navigator.mediaDevices?.getUserMedia || !videoElement) {
+          throw new Error("Camera access is not available in this browser.");
         }
+        const { BrowserQRCodeReader } = await import("@zxing/browser");
+        if (cancelled) return;
+        const reader = new BrowserQRCodeReader();
+        controls = await reader.decodeFromVideoDevice(undefined, videoElement, (result, _error, scannerControls) => {
+          controls = scannerControls;
+          if (cancelled) {
+            scannerControls.stop();
+            return;
+          }
+          if (!result || scanningRef.current) return;
+          const parsed = parseBadgeText(result.getText());
+          if (parsed) {
+            scanningRef.current = true;
+            void submitScan({ code: parsed.code, via: "qr" });
+          }
+        });
+        if (cancelled) controls.stop();
+      } catch {
+        if (!cancelled) setCameraError("Camera not available. Use the code entry below.");
       }
-      if (!cancelled) setTimeout(scan, 200);
-    };
+    }
 
-    scan();
-    return () => { cancelled = true; };
-  }, [state.kind, cameraError]); // eslint-disable-line react-hooks/exhaustive-deps
+    void startScanner();
+    return () => {
+      cancelled = true;
+      controls?.stop();
+      const stream = videoElement?.srcObject;
+      if (stream instanceof MediaStream) stream.getTracks().forEach((track) => track.stop());
+      if (videoElement) videoElement.srcObject = null;
+    };
+  }, [state.kind, cameraAttempt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function submitScan({ code, via }: { code: string; via: string }) {
     if (submitting) return;
@@ -440,6 +394,14 @@ export default function ScanClient({ player }: { player: Record<string, unknown>
             >
               <p style={{ color: "var(--paper-dim)", fontSize: 15, marginBottom: 8 }}>{cameraError}</p>
               <p style={{ color: "var(--muted)", fontSize: 13 }}>Use the code entry below.</p>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setCameraAttempt((attempt) => attempt + 1)}
+                style={{ minHeight: 40, marginTop: 16 }}
+              >
+                Try camera again
+              </button>
             </div>
           )}
 
@@ -458,7 +420,7 @@ export default function ScanClient({ player }: { player: Record<string, unknown>
                 type="text"
                 className="input input-code"
                 inputMode="numeric"
-                pattern="\d{3}\s?\d{3}"
+                pattern="\d{6}|\d{3}\s\d{3}"
                 maxLength={7}
                 placeholder="042 917"
                 value={manualCode}

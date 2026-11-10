@@ -23,10 +23,24 @@ export async function GET(req: NextRequest) {
     context.db.from("auth_conflicts").select("id", { count: "exact", head: true }).eq("status", "pending"),
     context.db.from("audit_log").select("id,actor_type,actor_id,action,target,at").order("at", { ascending: false }).limit(10),
   ]);
-  const results = [config, players, activePlayers, sessions, scans, roles, challenges, reports, submissions, conflicts, audit];
-  const failure = results.find((result) => result.error);
-  if (failure?.error) {
-    console.error("[admin/overview] Dashboard query failed:", failure.error.message);
+  const results = [
+    ["game_config", config], ["players", players], ["active players", activePlayers],
+    ["player presence", sessions], ["recent scans", scans], ["player roles", roles],
+    ["challenges", challenges], ["reports", reports], ["LinkedIn submissions", submissions],
+    ["registration conflicts", conflicts], ["audit log", audit],
+  ] as const;
+  const failure = results.find(([, result]) => result.error);
+  if (failure?.[1].error) {
+    const [query, result] = failure;
+    const message = result.error.message;
+    console.error(`[admin/overview] ${query} query failed:`, message);
+    if (query === "player presence" && /last_seen_at/i.test(message)) {
+      return NextResponse.json({
+        ok: false,
+        code: "MIGRATION_REQUIRED",
+        message: "The warden database update is missing. Run supabase/migrations/0004_warden_dashboard.sql in the Supabase SQL Editor, then reload.",
+      }, { status: 503 });
+    }
     return NextResponse.json({ ok: false, code: "DASHBOARD_QUERY_FAILED" }, { status: 500 });
   }
 

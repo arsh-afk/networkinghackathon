@@ -26,6 +26,7 @@ export default function LoginForm() {
   const [error, setError] = useState("");
   const [inviteToken, setInviteToken] = useState("");
   const [email, setEmail] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [character, setCharacter] = useState<CharacterInvitation | null>(null);
   const pinRef = useRef<HTMLInputElement>(null);
 
@@ -48,6 +49,7 @@ export default function LoginForm() {
         if (!res.ok || !data.ok) throw new Error(data.code || "This character link is invalid.");
         setEmail(data.email);
         setCharacter(data.character as CharacterInvitation);
+        setDisplayName((data.character as CharacterInvitation).fullName);
       })
       .catch((err: unknown) => {
         setError(err instanceof Error ? err.message : "Could not verify the character link.");
@@ -199,8 +201,8 @@ export default function LoginForm() {
                 maxLength={40}
                 placeholder="Your character name"
                 autoComplete="name"
-                value={character?.fullName ?? ""}
-                readOnly
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
               />
             </label>
           )}
